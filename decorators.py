@@ -2,11 +2,11 @@ import threading
 import functools
 
 
-def thread(cls):
+def thread(func):
     """Makes the wrapped function run in a seperate thread when called"""
-    @functools.wraps(wrapped=cls)
+    @functools.wraps(wrapped=func)
     def wrap(*args, **kwargs):
-        threading.Thread(target=cls, args=args, kwargs=kwargs).start()
+        threading.Thread(target=func, args=args, kwargs=kwargs).start()
     
     return wrap
 
