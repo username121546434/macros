@@ -1,12 +1,12 @@
 from time import sleep, time
 from tkinter import *
 from tkinter import messagebox
-from typing import Callable
+from typing import Any, Callable
 from pynput.keyboard import Key, KeyCode
 from pynput.mouse import Button as MouseButton
 from pynput import mouse, keyboard
 from decorators import thread
-from mouse_movement import MouseMovement
+from mouse_movement import MousePosChange
 from scroll import ScrollEvent
 from mouse_click import MouseClick
 
@@ -16,7 +16,6 @@ def on_click(x: int, y: int, button: MouseButton, pressed: bool):
     print(f'{x = }\n{y = }\n{pressed = }\n{button = }')
 
     obj = MouseClick(x, y, button, pressed)
-    mouse_clicks.append(obj)
     events.append(obj)
 
 
@@ -26,7 +25,6 @@ def on_scroll(x: int, y: int, dx: int, dy: int):
     print(f'{dx = }\n{dy = }')
 
     obj = ScrollEvent(x, y, dx, dy)
-    scrolls.append(obj)
     events.append(obj)
 
 
@@ -34,8 +32,7 @@ def on_move(x: int, y: int):
     print('On Move')
     print(f'{x = }\n{y = }')
 
-    obj = MouseMovement(x, y)
-    mouse_movements.append(obj)
+    obj = MousePosChange(x, y)
     events.append(obj)
 
 
@@ -46,7 +43,6 @@ def on_press(key: Key | KeyCode):
     key.created_at = time()
     key.pressed = True
 
-    key_presses.append(key)
     events.append(key)
 
 
@@ -57,7 +53,6 @@ def on_release(key: Key | KeyCode):
     key.created_at = time()
     key.pressed = False
 
-    key_presses.append(key)
     events.append(key)
 
 
@@ -77,30 +72,33 @@ def stop_listening():
 
 
 def clear_data():
-    mouse_movements.clear()
-    scrolls.clear()
     events.clear()
-    mouse_clicks.clear()
 
 
-def event_to_func(event, list_of_events: list[MouseMovement| ScrollEvent| Key| KeyCode| MouseClick]) -> Callable[[mouse.Controller, keyboard.Controller], None]:
+def event_to_func(event, list_of_events: list[MousePosChange | ScrollEvent | Key | KeyCode | MouseClick]) -> Callable[[mouse.Controller, keyboard.Controller], Any]:
     event_idx = list_of_events.index(event)
-    next_event = list_of_events[event_idx + 1]
-    if isinstance(event, MouseMovement):
-        for idx, move in enumerate(event.path):
-            if next_event.created_at < move[2]: # Another event is before the next move
-                return event_to_func(list_of_events[list_of_events.index(event) + 1], list_of_events)
-            return lambda m, k: (setattr(m, 'position', move), sleep(event.path[idx + 1][2]-move[2]))
+    try:
+        next_event = list_of_events[event_idx + 1]
+    except IndexError:
+        next_event = None
+
+    if next_event is not None:
+        sleep_func = lambda next_event, event: sleep(next_event.created_at - event.created_at)
+    else:
+        sleep_func = lambda next_event, event: None
+    
+    if isinstance(event, MousePosChange):
+        return lambda m, k: (setattr(m, 'position', (event.x, event.y)), sleep_func(next_event, event))
     elif isinstance(event, ScrollEvent):
-        return lambda m, k: (m.scroll(event.dx, event.dy), sleep(next_event.created_at - event.created_at))
+        return lambda m, k: (m.scroll(event.dx, event.dy), sleep_func(next_event, event))
     elif isinstance(event, (Key, KeyCode)):
-        return lambda m, k: (k.press(event) if event.pressed else k.release(event), sleep(next_event.created_at - event.created_at))
+        return lambda m, k: (k.press(event) if event.pressed else k.release(event), sleep_func(next_event, event))
     elif isinstance(event, MouseClick):
-        return lambda m, k: (m.press(event.button) if event.pressed else m.release(event.button), sleep(next_event.created_at - event.created_at))
+        return lambda m, k: (m.press(event.button) if event.pressed else m.release(event.button), sleep_func(next_event, event))
 
 
-def order_macro(macro: list[MouseMovement| ScrollEvent| Key| KeyCode| MouseClick]):
-    new: list[Callable[[mouse.Controller, keyboard.Controller], None]] = []
+def order_macro(macro: list[MousePosChange | ScrollEvent | Key | KeyCode | MouseClick]):
+    new: list[Callable[[mouse.Controller, keyboard.Controller], Any]] = []
 
     for event in macro:
         new.append(event_to_func(event, macro))
@@ -110,7 +108,10 @@ def order_macro(macro: list[MouseMovement| ScrollEvent| Key| KeyCode| MouseClick
 
 def play_macro():
     stop_listening()
-    _play_macro(delay_state.get())
+    delay = delay_state.get()
+    if delay == 0:
+        delay = 1
+    _play_macro(delay)
 
 
 @thread
@@ -123,20 +124,17 @@ def _play_macro(delay: int):
 
     while macro_on:
         with keyboard.Events() as key_events:
-            key = key_events.get(delay * 0.001)
-            if key is not None:
-                break
             for func in order_macro(macro):
+                key = key_events.get(delay * 0.001)
+                if key:
+                    macro_on = False
+                    break
                 func(mouse_controller, keyboard_controller)
 
     messagebox.showinfo('Macro Stopped', 'Your macro has stopped')
 
 
-mouse_movements: list[MouseMovement] = []
-scrolls: list[ScrollEvent] = []
-mouse_clicks: list[MouseClick] = []
-events: list[MouseMovement| ScrollEvent| Key| KeyCode| MouseClick] = []
-key_presses: list[Key|KeyCode] = []
+events: list[MousePosChange | ScrollEvent | Key | KeyCode | MouseClick] = []
 
 key_listener = keyboard.Listener(on_press=on_press)
 mouse_listener = mouse.Listener(on_click=on_click, on_scroll=on_scroll, on_move=on_move)
