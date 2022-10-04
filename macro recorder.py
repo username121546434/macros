@@ -97,15 +97,6 @@ def event_to_func(event, list_of_events: list[MousePosChange | ScrollEvent | Key
         return lambda m, k: (m.press(event.button) if event.pressed else m.release(event.button), sleep_func(next_event, event))
 
 
-def order_macro(macro: list[MousePosChange | ScrollEvent | Key | KeyCode | MouseClick]):
-    new: list[Callable[[mouse.Controller, keyboard.Controller], Any]] = []
-
-    for event in macro:
-        new.append(event_to_func(event, macro))
-
-    return new
-
-
 def play_macro():
     stop_listening()
     delay = delay_state.get()
@@ -120,16 +111,16 @@ def _play_macro(delay: int):
     keyboard_controller = keyboard.Controller()
 
     macro_on = True
-    macro = events.copy()
+    macro_events = events.copy()
 
-    while macro_on:
-        with keyboard.Events() as key_events:
-            for func in order_macro(macro):
+    with keyboard.Events() as key_events:
+        while macro_on:
+            for event in macro_events:
+                event_to_func(event, macro_events)(mouse_controller, keyboard_controller)
                 key = key_events.get(delay * 0.001)
-                if key:
+                if key and key.key != event:
                     macro_on = False
                     break
-                func(mouse_controller, keyboard_controller)
 
     messagebox.showinfo('Macro Stopped', 'Your macro has stopped')
 
