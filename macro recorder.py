@@ -5,7 +5,7 @@ from typing import Any, Callable
 from pynput.keyboard import Key, KeyCode
 from pynput.mouse import Button as MouseButton
 from pynput import mouse, keyboard
-from decorators import thread
+from utils import thread
 from mouse_movement import MousePosChange
 from scroll import ScrollEvent
 from mouse_click import MouseClick
