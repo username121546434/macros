@@ -99,10 +99,7 @@ def event_to_func(event, list_of_events: list[MousePosChange | ScrollEvent | Key
 
 def play_macro():
     stop_listening()
-    delay = delay_state.get()
-    if delay == 0:
-        delay = 1
-    _play_macro(delay)
+    _play_macro(delay_state.get())
 
 
 @thread
@@ -139,7 +136,7 @@ Button(window, text='Delete Data', command=clear_data).pack()
 Button(window, text='Play Macro', command=play_macro).pack()
 
 delay_state = IntVar(window)
-Label(window, text='Delay between each event (ms)').pack()
-Spinbox(window, from_=0, to=60000, textvariable=delay_state, width=6).pack()
+Label(window, text='Delay between each event (milliseconds)').pack()
+Spinbox(window, from_=1, to=60000, textvariable=delay_state, width=6).pack()
 
 window.mainloop()
