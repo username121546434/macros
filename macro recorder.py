@@ -99,16 +99,17 @@ def event_to_func(event, list_of_events: list[MousePosChange | ScrollEvent | Key
 
 def play_macro():
     stop_listening()
-    _play_macro(delay_state.get())
+    _play_macro(delay_state.get(), repitions.get())
 
 
 @thread
-def _play_macro(delay: int):
+def _play_macro(delay: int, reps: int):
     mouse_controller = mouse.Controller()
     keyboard_controller = keyboard.Controller()
 
     macro_on = True
     macro_events = events.copy()
+    rep_num = 0
 
     with keyboard.Events() as key_events:
         while macro_on:
@@ -118,6 +119,9 @@ def _play_macro(delay: int):
                 if key and key.key != event:
                     macro_on = False
                     break
+            rep_num += 1
+            if rep_num == reps:
+                break
 
     messagebox.showinfo('Macro Stopped', 'Your macro has stopped')
 
@@ -137,6 +141,10 @@ Button(window, text='Play Macro', command=play_macro).pack()
 
 delay_state = IntVar(window)
 Label(window, text='Delay between each event (milliseconds)').pack()
-Spinbox(window, from_=1, to=60000, textvariable=delay_state, width=6).pack()
+Spinbox(window, from_=1, to=float('inf'), textvariable=delay_state, width=6).pack()
+
+repitions = IntVar(window)
+Label(window, text='Amount of repitions').pack()
+Spinbox(window, from_=1, to=float('inf'), textvariable=repitions, width=6).pack()
 
 window.mainloop()
